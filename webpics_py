@@ -1,0 +1,63 @@
+#!/usr/bin/python
+
+import sys, subprocess, os, shutil
+
+def pixels (filename):
+    info = str(subprocess.check_output(["file", filename])).split()
+    return (int(info[4]), int(info[6][:-1]))
+
+max_x_pixels = 1280
+dspace_thresh = 800 * 1024
+
+for img in sys.argv[1:]:
+    (whitespace, scaled, compression) = (False, False, 100)
+    split = os.path.splitext(os.path.basename(img))
+    backup = split[0] + '_orig' + split[1]
+    orig_dspace = os.stat(img).st_size
+    textout = img + ': ' + str(orig_dspace / 1024) + 'kB -> '
+
+    # convert to png if jpg
+    if split[1] == ".jpg" or split[1] == ".jpeg":
+        backup_png = split[0] + '_orig.png'
+        subprocess.call(["convert", backup, backup_png])
+        backup = backup_png
+        img = split[0] + '.png'
+
+    # Add whitespace to the sides of portrait format images
+    os.rename(img, backup)
+    if pixels(backup)[0] < pixels(backup)[1]:
+        ypix = pixels(backup)[1]
+        subprocess.call(["convert", "-size", str( int(4./3 * ypix)) + "x" + str(ypix),
+                        "xc:white", backup, "-gravity", "center", "-composite", img])
+        whitespace = True
+    else:
+        shutil.copy(backup, img)
+
+    # Scale down large images
+    if pixels(img)[0] > max_x_pixels:
+        subprocess.call(["convert", img, "-resize", str(max_x_pixels), img])
+        scaled = True
+    temp = split[0] + '_temp' + split[1]
+    shutil.copy(img, temp)
+    
+    # compress with pngquant until small enough
+    while os.stat(temp).st_size > dspace_thresh and compression > 20:
+        compression -= 10
+        subprocess.call(["pngquant", "--ext", "_temp.png", "--force", 
+                        "--quality=" + str(compression - 15) + "-" +str(compression), img])
+    os.rename(temp, img)
+
+    # text output
+    info = ""
+    if scaled:
+        info += "scaled down"
+    if compression < 100:
+        if info:
+            info += ", "
+        info += "compressed to " + str(compression) + "%"
+    textout += str(os.stat(img).st_size / 1024) + 'kB'
+    if info:
+        textout += " (" + info + ")"
+    if whitespace:
+        textout += ", whitespace added"
+    print textout
