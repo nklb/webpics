@@ -1,5 +1,5 @@
 # webpics
-Scripts to reduce the file size of multiple images for blogs and websites
+Just a script to reduce the file size and adjust the format of multiple images for blogs and websites
 
 This script takes (lists of) jpeg- and png-files as input and
 - converts all images to png-files
